@@ -1,6 +1,8 @@
 package com.minje.chatbot.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import jakarta.persistence.Converter;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -9,6 +11,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 
 @Entity
 @Table(name = "messages")
@@ -27,7 +30,7 @@ public class Message {
     private Long conversationId;
 
     @Column(name = "role", nullable = false, length = 20)
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = RoleConverter.class)
     private Role role;
 
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
@@ -39,6 +42,7 @@ public class Message {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "conversation_id", insertable = false, updatable = false)
+    @JsonIgnore  // ← 추가: Swagger 문서 생성 시 무한 루프 방지
     private Conversation conversation;
 
     public enum Role {
@@ -54,6 +58,26 @@ public class Message {
 
         public String getValue() {
             return value;
+        }
+
+        public static Role fromValue(String value) {
+            return Arrays.stream(values())
+                    .filter(r -> r.value.equals(value))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Unknown role: " + value));
+        }
+    }
+
+    @Converter(autoApply = false)
+    public static class RoleConverter implements AttributeConverter<Role, String> {
+        @Override
+        public String convertToDatabaseColumn(Role role) {
+            return role != null ? role.getValue() : null;
+        }
+
+        @Override
+        public Role convertToEntityAttribute(String value) {
+            return value != null ? Role.fromValue(value) : null;
         }
     }
 }
