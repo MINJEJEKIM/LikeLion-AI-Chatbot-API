@@ -44,7 +44,7 @@ dependencies {
     implementation 'com.squareup.okhttp3:okhttp-sse:4.12.0'
 
     // Swagger/OpenAPI
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'

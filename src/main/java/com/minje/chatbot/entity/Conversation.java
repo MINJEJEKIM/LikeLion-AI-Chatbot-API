@@ -1,5 +1,6 @@
 package com.minje.chatbot.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -42,10 +43,12 @@ public class Conversation {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", insertable = false, updatable = false)
+    @JsonIgnore  // ← 추가: Swagger 문서 생성 시 무한 루프 방지
     private User user;
 
     @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("createdAt ASC")
+    @JsonIgnore  // ← 추가: Swagger 문서 생성 시 무한 루프 방지
     @Builder.Default
     private List<Message> messages = new ArrayList<>();
 
