@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -57,7 +58,7 @@ public class ChatController {
     @GetMapping("/conversations")
     @Operation(summary = "대화 목록 조회", description = "사용자의 모든 대화 목록을 조회합니다.")
     public ApiResponse<Page<ConversationDTO>> getConversations(
-            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
+            @ParameterObject @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
 
         log.info("Fetching conversations with pageable: {}", pageable);
 

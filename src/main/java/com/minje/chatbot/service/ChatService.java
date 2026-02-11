@@ -122,6 +122,7 @@ public class ChatService {
         return emitter;
     }
 
+    @Transactional
     public Page<ConversationDTO> getConversations(Pageable pageable) {
         User user = getOrCreateDefaultUser();
 
