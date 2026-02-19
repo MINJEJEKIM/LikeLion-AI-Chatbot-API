@@ -35,6 +35,10 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Claude Code ###
+.claude/
+nul
 /gradle/wrapper/gradle-wrapper.jar
 /src/main/resources/application.yaml
 /gradle/wrapper/gradle-wrapper.properties
