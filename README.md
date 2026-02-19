@@ -19,11 +19,12 @@ OpenAI GPT-3.5-turbo 기반의 AI 챗봇 REST API 서버입니다.
 
 ```
 src/main/java/com/minje/chatbot/
-├── config/          # OpenAPI(Swagger), CORS 설정
+├── config/          # Security(필터 등록, CORS), OpenAI 설정
 ├── controller/      # REST API 컨트롤러
 ├── dto/             # 요청/응답 DTO
 ├── entity/          # JPA 엔티티 (User, Conversation, Message)
 ├── exception/       # 글로벌 예외 처리
+├── filter/          # 서블릿 필터 (API Key 인증, Rate Limiting)
 ├── repository/      # Spring Data JPA 리포지토리
 ├── service/         # 비즈니스 로직 (ChatService, OpenAIService)
 └── util/            # API Key 검증 유틸리티
@@ -39,6 +40,24 @@ Users (1) ──── (N) Conversations (1) ──── (N) Messages
   updated_at           created_at              content
                        updated_at              created_at
 ```
+
+## 인증 및 Rate Limiting
+
+### API Key 인증
+모든 API 요청에 `X-API-KEY` 헤더가 필요합니다. (Swagger UI 경로 제외)
+
+```
+X-API-KEY: sk-proj-your-api-key
+```
+
+- 키가 없거나 형식이 잘못된 경우 `401 Unauthorized` 반환
+- 등록되지 않은 키인 경우 `401 Unauthorized` 반환
+
+### Rate Limiting
+Redis 기반 고정 윈도우 방식으로 API Key당 **분당 10회** 요청을 제한합니다.
+
+- 초과 시 `429 Too Many Requests` 반환
+- 응답 헤더에 `X-RateLimit-Limit`, `X-RateLimit-Remaining` 포함
 
 ## API Endpoints
 
@@ -114,17 +133,22 @@ http://localhost:8080/api/v1/swagger-ui.html
 
 ## Features
 
+- **API Key 인증** - X-API-KEY 헤더 기반 인증 필터
+- **Rate Limiting** - Redis 기반 API Key당 분당 10회 요청 제한
 - **동기/스트리밍 응답** - 일반 응답과 SSE 실시간 스트리밍 모두 지원
-- **대화 컨텍스트 유지** - 이전 대화 이력을 포함하여 GPT에 전송
+- **대화 컨텍스트 유지** - 최근 10개 메시지를 포함하여 GPT에 전송
 - **대화 제목 자동 생성** - 첫 메시지 기반으로 대화 제목 자동 설정
 - **페이징 처리** - 대화 목록 페이징 및 정렬 지원
 - **글로벌 예외 처리** - 일관된 에러 응답 형식
-- **Swagger UI** - API 문서 자동 생성 및 테스트 지원
+- **Swagger UI** - API 문서 자동 생성 및 API Key 인증 테스트 지원
 
 ## Git History
 
 | Commit | Description |
 |--------|-------------|
+| `e164882` | feat: API Key 인증 필터, Redis Rate Limiting, Swagger 보안 설정 추가 |
+| `a6fd311` | fix: README.md 인코딩을 UTF-8로 변환 |
+| `a0585f1` | docs: README.md 작성 - 프로젝트 소개, 기술 스택, API 문서 등 |
 | `fa2a65e` | fix: /conversations 엔드포인트 500 에러 수정 |
 | `58e8705` | fix: ChatService 및 관련 클래스 호환성 문제 수정 |
 | `4f01ae7` | initial setting |
