@@ -45,6 +45,7 @@ public class ChatController {
 
     @PostMapping(value = "/chat/completions/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "스트리밍 메시지 전송", description = "GPT에게 메시지를 전송하고 스트리밍 방식으로 응답을 받습니다.")
+    // Swagger UI는 SSE 스트리밍을 제대로 렌더링하지 못해서 원시 이벤트가 그대로 나열되는 상황이 발생함.
     public SseEmitter sendMessageStream(
             @Parameter(description = "채팅 요청", required = true)
             @Valid @RequestBody ChatRequest request) {

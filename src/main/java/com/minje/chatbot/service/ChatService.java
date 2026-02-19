@@ -20,6 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -47,9 +49,8 @@ public class ChatService {
         // 사용자 메시지 저장
         Message userMessage = saveMessage(conversation.getId(), Message.Role.USER, request.getContent());
 
-        // 이전 대화 이력 가져오기
-        List<Message> conversationHistory = messageRepository
-                .findByConversationIdOrderByCreatedAtAsc(conversation.getId());
+        // 이전 대화 이력 가져오기 (최근 10개만)
+        List<Message> conversationHistory = getRecentMessages(conversation.getId());
 
         // OpenAI API 호출
         String aiResponse = openAIService.createChatCompletion(
@@ -60,9 +61,12 @@ public class ChatService {
         // AI 응답 저장
         Message assistantMessage = saveMessage(conversation.getId(), Message.Role.ASSISTANT, aiResponse);
 
-        // 대화 제목 자동 생성 (첫 메시지인 경우)
+        // 대화 제목 설정 (첫 메시지인 경우)
         if (conversation.getTitle() == null || conversation.getTitle().isEmpty()) {
-            updateConversationTitle(conversation, request.getContent());
+            String title = (request.getTitle() != null && !request.getTitle().isBlank())
+                    ? request.getTitle()
+                    : request.getContent();
+            updateConversationTitle(conversation, title);
         }
 
         return ChatResponse.builder()
@@ -95,9 +99,8 @@ public class ChatService {
         // 사용자 메시지 저장
         saveMessage(conversation.getId(), Message.Role.USER, request.getContent());
 
-        // 이전 대화 이력
-        List<Message> conversationHistory = messageRepository
-                .findByConversationIdOrderByCreatedAtAsc(conversation.getId());
+        // 이전 대화 이력 (최근 10개만)
+        List<Message> conversationHistory = getRecentMessages(conversation.getId());
 
         // 비동기 스트리밍
         new Thread(() -> {
@@ -108,9 +111,12 @@ public class ChatService {
                         emitter
                 );
 
-                // 대화 제목 자동 생성
+                // 대화 제목 설정
                 if (conversation.getTitle() == null || conversation.getTitle().isEmpty()) {
-                    updateConversationTitle(conversation, request.getContent());
+                    String title = (request.getTitle() != null && !request.getTitle().isBlank())
+                            ? request.getTitle()
+                            : request.getContent();
+                    updateConversationTitle(conversation, title);
                 }
 
             } catch (Exception e) {
@@ -179,10 +185,16 @@ public class ChatService {
         // 새 대화 생성
         Conversation newConversation = Conversation.builder()
                 .userId(userId)
-                .title("New Conversation")
                 .build();
 
         return conversationRepository.save(newConversation);
+    }
+
+    private List<Message> getRecentMessages(Long conversationId) {
+        List<Message> messages = new ArrayList<>(
+                messageRepository.findTop10ByConversationIdOrderByCreatedAtDesc(conversationId));
+        Collections.reverse(messages);
+        return messages;
     }
 
     private Message saveMessage(Long conversationId, Message.Role role, String content) {

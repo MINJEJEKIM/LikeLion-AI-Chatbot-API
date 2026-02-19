@@ -8,8 +8,8 @@ import java.util.Base64;
 @Component
 public class ApiKeyValidator {
 
-    private static final String API_KEY_PREFIX = "sk_live_";
-    private static final int API_KEY_LENGTH = 32;
+    private static final String API_KEY_PREFIX = "sk-proj-";
+    private static final int API_KEY_LENGTH = 256;
 
     /**
      * API Key 생성
