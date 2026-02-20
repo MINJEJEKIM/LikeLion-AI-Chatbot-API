@@ -8,6 +8,7 @@ import com.minje.chatbot.service.ChatService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,36 +35,41 @@ public class ChatController {
     @Operation(summary = "메시지 전송", description = "GPT에게 메시지를 전송하고 응답을 받습니다.")
     public ApiResponse<ChatResponse> sendMessage(
             @Parameter(description = "채팅 요청", required = true)
-            @Valid @RequestBody ChatRequest request) {
+            @Valid @RequestBody ChatRequest request,
+            HttpServletRequest httpRequest) {
 
+        String apiKey = (String) httpRequest.getAttribute("apiKey");
         log.info("Received chat request: conversationId={}, content={}",
                 request.getConversationId(), request.getContent());
 
-        ChatResponse response = chatService.sendMessage(request);
+        ChatResponse response = chatService.sendMessage(apiKey, request);
         return ApiResponse.success(response);
     }
 
     @PostMapping(value = "/chat/completions/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "스트리밍 메시지 전송", description = "GPT에게 메시지를 전송하고 스트리밍 방식으로 응답을 받습니다.")
-    // Swagger UI는 SSE 스트리밍을 제대로 렌더링하지 못해서 원시 이벤트가 그대로 나열되는 상황이 발생함.
     public SseEmitter sendMessageStream(
             @Parameter(description = "채팅 요청", required = true)
-            @Valid @RequestBody ChatRequest request) {
+            @Valid @RequestBody ChatRequest request,
+            HttpServletRequest httpRequest) {
 
+        String apiKey = (String) httpRequest.getAttribute("apiKey");
         log.info("Received streaming chat request: conversationId={}, message={}",
                 request.getConversationId(), request.getContent());
 
-        return chatService.sendMessageStream(request);
+        return chatService.sendMessageStream(apiKey, request);
     }
 
     @GetMapping("/conversations")
     @Operation(summary = "대화 목록 조회", description = "사용자의 모든 대화 목록을 조회합니다.")
     public ApiResponse<Page<ConversationDTO>> getConversations(
-            @ParameterObject @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
+            @ParameterObject @PageableDefault(size = 20, sort = "createdAt") Pageable pageable,
+            HttpServletRequest httpRequest) {
 
+        String apiKey = (String) httpRequest.getAttribute("apiKey");
         log.info("Fetching conversations with pageable: {}", pageable);
 
-        Page<ConversationDTO> conversations = chatService.getConversations(pageable);
+        Page<ConversationDTO> conversations = chatService.getConversations(apiKey, pageable);
         return ApiResponse.success(conversations);
     }
 
@@ -71,11 +77,13 @@ public class ChatController {
     @Operation(summary = "특정 대화 조회", description = "특정 대화의 상세 정보를 조회합니다.")
     public ApiResponse<ConversationDTO> getConversation(
             @Parameter(description = "대화 ID", required = true)
-            @PathVariable Long conversationId) {
+            @PathVariable Long conversationId,
+            HttpServletRequest httpRequest) {
 
+        String apiKey = (String) httpRequest.getAttribute("apiKey");
         log.info("Fetching conversation: {}", conversationId);
 
-        ConversationDTO conversation = chatService.getConversation(conversationId);
+        ConversationDTO conversation = chatService.getConversation(apiKey, conversationId);
         return ApiResponse.success(conversation);
     }
 
@@ -84,11 +92,13 @@ public class ChatController {
     @Operation(summary = "대화 삭제", description = "특정 대화를 삭제합니다.")
     public ApiResponse<Void> deleteConversation(
             @Parameter(description = "대화 ID", required = true)
-            @PathVariable Long conversationId) {
+            @PathVariable Long conversationId,
+            HttpServletRequest httpRequest) {
 
+        String apiKey = (String) httpRequest.getAttribute("apiKey");
         log.info("Deleting conversation: {}", conversationId);
 
-        chatService.deleteConversation(conversationId);
+        chatService.deleteConversation(apiKey, conversationId);
         return ApiResponse.success(null);
     }
 }

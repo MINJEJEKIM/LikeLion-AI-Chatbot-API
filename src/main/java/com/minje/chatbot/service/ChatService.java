@@ -3,6 +3,7 @@ package com.minje.chatbot.service;
 import com.minje.chatbot.dto.ChatRequest;
 import com.minje.chatbot.dto.ChatResponse;
 import com.minje.chatbot.dto.ConversationDTO;
+import com.minje.chatbot.dto.MessageDTO;
 
 import com.minje.chatbot.entity.Conversation;
 import com.minje.chatbot.entity.Message;
@@ -35,16 +36,25 @@ public class ChatService {
     private final MessageRepository messageRepository;
     private final OpenAIService openAIService;
 
-    // 기본 사용자 ID (개발/테스트용)
-    private static final Long DEFAULT_USER_ID = 1L;
-
     @Transactional
-    public ChatResponse sendMessage(ChatRequest request) {
-        // 기본 사용자 가져오기 (또는 자동 생성)
-        User user = getOrCreateDefaultUser();
+    public ChatResponse sendMessage(String apiKey, ChatRequest request) {
+        User user = getUserByApiKey(apiKey);
 
         // 대화 조회 또는 생성
         Conversation conversation = getOrCreateConversation(user.getId(), request.getConversationId());
+
+        // 기존 대화인 경우 소유권 검증
+        if (request.getConversationId() != null) {
+            validateOwnership(conversation, user.getId());
+        }
+
+        // 새 대화이고 systemPrompt가 있으면 SYSTEM 메시지로 저장
+        if (request.getConversationId() == null && request.getSystemPrompt() != null && !request.getSystemPrompt().isBlank()) {
+            saveMessage(conversation.getId(), Message.Role.SYSTEM, request.getSystemPrompt());
+        }
+
+        // 시스템 프롬프트 결정: 요청에 있으면 우선, 없으면 DB에서 조회
+        String systemPrompt = resolveSystemPrompt(conversation.getId(), request.getSystemPrompt());
 
         // 사용자 메시지 저장
         Message userMessage = saveMessage(conversation.getId(), Message.Role.USER, request.getContent());
@@ -55,7 +65,8 @@ public class ChatService {
         // OpenAI API 호출
         String aiResponse = openAIService.createChatCompletion(
                 conversationHistory,
-                request.getContent()
+                request.getContent(),
+                systemPrompt
         );
 
         // AI 응답 저장
@@ -87,14 +98,26 @@ public class ChatService {
     }
 
     @Transactional
-    public SseEmitter sendMessageStream(ChatRequest request) {
+    public SseEmitter sendMessageStream(String apiKey, ChatRequest request) {
         SseEmitter emitter = new SseEmitter(300000L); // 5분 타임아웃
 
-        // 기본 사용자 가져오기
-        User user = getOrCreateDefaultUser();
+        User user = getUserByApiKey(apiKey);
 
         // 대화 조회 또는 생성
         Conversation conversation = getOrCreateConversation(user.getId(), request.getConversationId());
+
+        // 기존 대화인 경우 소유권 검증
+        if (request.getConversationId() != null) {
+            validateOwnership(conversation, user.getId());
+        }
+
+        // 새 대화이고 systemPrompt가 있으면 SYSTEM 메시지로 저장
+        if (request.getConversationId() == null && request.getSystemPrompt() != null && !request.getSystemPrompt().isBlank()) {
+            saveMessage(conversation.getId(), Message.Role.SYSTEM, request.getSystemPrompt());
+        }
+
+        // 시스템 프롬프트 결정
+        String systemPrompt = resolveSystemPrompt(conversation.getId(), request.getSystemPrompt());
 
         // 사용자 메시지 저장
         saveMessage(conversation.getId(), Message.Role.USER, request.getContent());
@@ -108,6 +131,7 @@ public class ChatService {
                 openAIService.createChatCompletionStream(
                         conversationHistory,
                         request.getContent(),
+                        systemPrompt,
                         emitter
                 );
 
@@ -128,9 +152,8 @@ public class ChatService {
         return emitter;
     }
 
-    @Transactional
-    public Page<ConversationDTO> getConversations(Pageable pageable) {
-        User user = getOrCreateDefaultUser();
+    public Page<ConversationDTO> getConversations(String apiKey, Pageable pageable) {
+        User user = getUserByApiKey(apiKey);
 
         Page<Conversation> conversations = conversationRepository
                 .findByUserId(user.getId(), pageable);
@@ -138,42 +161,74 @@ public class ChatService {
         return conversations.map(this::toConversationDTO);
     }
 
-    public ConversationDTO getConversation(Long conversationId) {
+    public ConversationDTO getConversation(String apiKey, Long conversationId) {
+        User user = getUserByApiKey(apiKey);
+
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new CustomException("NOT_FOUND", "Conversation not found", HttpStatus.NOT_FOUND));
 
+        validateOwnership(conversation, user.getId());
+
         List<Message> messages = messageRepository
                 .findByConversationIdOrderByCreatedAtAsc(conversationId);
+
+        List<MessageDTO> messageDTOs = messages.stream()
+                .map(msg -> MessageDTO.builder()
+                        .id(msg.getId())
+                        .conversationId(msg.getConversationId())
+                        .role(msg.getRole().getValue())
+                        .content(msg.getContent())
+                        .createdAt(msg.getCreatedAt())
+                        .build())
+                .toList();
 
         return ConversationDTO.builder()
                 .id(conversation.getId())
                 .userId(conversation.getUserId())
                 .title(conversation.getTitle())
                 .messageCount(messages.size())
+                .messages(messageDTOs)
                 .createdAt(conversation.getCreatedAt())
                 .updatedAt(conversation.getUpdatedAt())
                 .build();
     }
 
     @Transactional
-    public void deleteConversation(Long conversationId) {
+    public void deleteConversation(String apiKey, Long conversationId) {
+        User user = getUserByApiKey(apiKey);
+
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new CustomException("NOT_FOUND", "Conversation not found", HttpStatus.NOT_FOUND));
 
+        validateOwnership(conversation, user.getId());
+
+        messageRepository.deleteAllByConversationId(conversationId);
         conversationRepository.delete(conversation);
         log.info("Deleted conversation: {}", conversationId);
     }
 
     // === Private Helper Methods ===
 
-    private User getOrCreateDefaultUser() {
-        return userRepository.findByApiKey("default-user")
-                .orElseGet(() -> {
-                    User newUser = User.builder()
-                            .apiKey("default-user")
-                            .build();
-                    return userRepository.save(newUser);
-                });
+    private User getUserByApiKey(String apiKey) {
+        return userRepository.findByApiKey(apiKey)
+                .orElseThrow(() -> new CustomException("UNAUTHORIZED", "Invalid API Key", HttpStatus.UNAUTHORIZED));
+    }
+
+    private void validateOwnership(Conversation conversation, Long userId) {
+        if (!conversation.getUserId().equals(userId)) {
+            throw new CustomException("FORBIDDEN", "Access denied to this conversation", HttpStatus.FORBIDDEN);
+        }
+    }
+
+    private String resolveSystemPrompt(Long conversationId, String requestSystemPrompt) {
+        // 요청에 systemPrompt가 있으면 우선 사용
+        if (requestSystemPrompt != null && !requestSystemPrompt.isBlank()) {
+            return requestSystemPrompt;
+        }
+        // 없으면 DB에서 저장된 SYSTEM 메시지 조회
+        return messageRepository.findFirstByConversationIdAndRoleOrderByCreatedAtAsc(conversationId, Message.Role.SYSTEM)
+                .map(Message::getContent)
+                .orElse(null);
     }
 
     private Conversation getOrCreateConversation(Long userId, Long conversationId) {
