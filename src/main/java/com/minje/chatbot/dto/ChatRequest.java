@@ -21,4 +21,7 @@ public class ChatRequest {
 
     @Schema(description = "대화 제목 (신규 대화인 경우)", example = "Spring Boot 학습")
     private String title;
+
+    @Schema(description = "시스템 프롬프트 (AI 역할/페르소나 지정, 선택값)", example = "너는 영어 튜터야", nullable = true)
+    private String systemPrompt;
 }

@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -26,6 +27,9 @@ public class ConversationDTO {
 
     @Schema(description = "메시지 개수", example = "8")
     private Integer messageCount;
+
+    @Schema(description = "메시지 목록 (상세 조회 시에만 포함)")
+    private List<MessageDTO> messages;
 
     @Schema(description = "생성 일시", example = "2026-02-14T10:00:00")
     private LocalDateTime createdAt;

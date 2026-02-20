@@ -15,7 +15,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -41,9 +40,9 @@ public class OpenAIService {
     /**
      * 일반 채팅 완료 (동기)
      */
-    public String createChatCompletion(List<Message> conversationHistory, String userMessage) {
+    public String createChatCompletion(List<Message> conversationHistory, String userMessage, String systemPrompt) {
         try {
-            List<ChatMessage> messages = convertToChatMessages(conversationHistory, userMessage);
+            List<ChatMessage> messages = convertToChatMessages(conversationHistory, userMessage, systemPrompt);
 
             ChatCompletionRequest request = ChatCompletionRequest.builder()
                     .model(model)
@@ -72,9 +71,10 @@ public class OpenAIService {
      */
     public void createChatCompletionStream(List<Message> conversationHistory,
                                            String userMessage,
+                                           String systemPrompt,
                                            SseEmitter emitter) {
         try {
-            List<ChatMessage> messages = convertToChatMessages(conversationHistory, userMessage);
+            List<ChatMessage> messages = convertToChatMessages(conversationHistory, userMessage, systemPrompt);
 
             ChatCompletionRequest request = ChatCompletionRequest.builder()
                     .model(model)
@@ -129,13 +129,22 @@ public class OpenAIService {
     /**
      * Message 엔티티를 ChatMessage로 변환
      */
-    private List<ChatMessage> convertToChatMessages(List<Message> conversationHistory, String userMessage) {
-        List<ChatMessage> messages = conversationHistory.stream()
+    private List<ChatMessage> convertToChatMessages(List<Message> conversationHistory, String userMessage, String systemPrompt) {
+        List<ChatMessage> messages = new java.util.ArrayList<>();
+
+        // 시스템 프롬프트가 있으면 맨 앞에 추가
+        if (systemPrompt != null && !systemPrompt.isBlank()) {
+            messages.add(new ChatMessage(ChatMessageRole.SYSTEM.value(), systemPrompt));
+        }
+
+        // 대화 이력 추가 (SYSTEM role 메시지는 제외 — 위에서 별도 처리)
+        conversationHistory.stream()
+                .filter(msg -> msg.getRole() != Message.Role.SYSTEM)
                 .map(msg -> new ChatMessage(
                         msg.getRole().getValue(),
                         msg.getContent()
                 ))
-                .collect(Collectors.toList());
+                .forEach(messages::add);
 
         // 현재 사용자 메시지 추가
         messages.add(new ChatMessage(ChatMessageRole.USER.value(), userMessage));
