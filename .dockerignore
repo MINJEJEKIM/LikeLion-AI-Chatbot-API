@@ -4,3 +4,7 @@
 build
 .env
 *.md
+nul
+.claude
+.vscode
+docker-compose.yml

@@ -67,7 +67,7 @@ X-API-KEY: sk-proj-your-api-key
 ```
 
 - 키가 없거나 형식이 잘못된 경우 `401 Unauthorized` 반환
-- 등록되지 않은 키인 경우 `401 Unauthorized` 반환
+- 유효한 형식의 새 키는 자동으로 사용자 등록 후 사용 가능
 - API Key는 SHA-256 해시 후 DB 조회
 
 ### Rate Limiting
@@ -87,6 +87,7 @@ Base Path: `/api/v1`
 | `GET` | `/conversations` | 대화 목록 조회 (페이징) |
 | `GET` | `/conversations/{id}` | 특정 대화 상세 조회 |
 | `DELETE` | `/conversations/{id}` | 대화 삭제 |
+| `GET` | `/health` | 헬스체크 |
 
 ### Request / Response 예시
 
@@ -141,17 +142,30 @@ openai:
 ./gradlew bootRun
 ```
 
-### 운영 환경 실행
-
-`application-prod.yaml`을 사용하며, 환경변수로 설정값을 주입합니다:
+### Docker 실행
 
 ```bash
-java -jar chatbot.jar --spring.profiles.active=prod \
-  -DDB_URL=jdbc:postgresql://db-host:5432/chatbot \
-  -DDB_USERNAME=prod_user \
-  -DDB_PASSWORD=prod_password \
-  -DREDIS_HOST=redis-host \
-  -DOPENAI_API_KEY=sk-proj-...
+docker build -t chatbot .
+docker run -p 8080:8080 \
+  -e DB_URL=jdbc:postgresql://db-host:5432/chatbot \
+  -e DB_USERNAME=prod_user \
+  -e DB_PASSWORD=prod_password \
+  -e REDIS_HOST=redis-host \
+  -e REDIS_PORT=6379 \
+  -e REDIS_PASSWORD=your_redis_password \
+  -e OPENAI_API_KEY=sk-proj-... \
+  chatbot
+```
+
+### Railway 배포
+
+```bash
+npm install -g @railway/cli
+railway login
+railway init
+# Railway 대시보드에서 PostgreSQL, Redis 추가 후
+railway up --service chatbot-app --detach --no-gitignore
+railway domain --service chatbot-app
 ```
 
 ### API 문서 확인
@@ -175,13 +189,24 @@ http://localhost:8080/api/v1/swagger-ui.html
 - **페이징 처리** - 대화 목록 페이징 및 정렬 지원
 - **글로벌 예외 처리** - 일관된 에러 응답 형식
 - **Swagger UI** - API 문서 자동 생성 및 API Key 인증 테스트 지원
+- **API Key 자동 등록** - 유효한 형식의 새 키 입력 시 자동으로 사용자 생성
+- **헬스체크** - GET /health 엔드포인트 제공
+- **Docker 지원** - 멀티스테이지 빌드 Dockerfile 제공
+- **Railway 배포** - PostgreSQL, Redis 포함 원클릭 클라우드 배포
 - **운영 환경 분리** - application-prod.yaml로 환경변수 기반 설정
 
 ## Git History
 
 | Commit | Description |
 |--------|-------------|
-| `e164882` | feat: API Key 인증 필터, Redis Rate Limiting, Swagger 보안 설정 추가 |
+| `8e5212d` | chore: Railway 배포를 위한 .gitignore 정리 및 Gradle wrapper 추가 |
+| `a4815b1` | feat: Docker 배포 설정 및 API 인증 개선 |
+| `0afa5c6` | feat: 헬스체크 엔드포인트 추가 (GET /health) |
+| `05386c0` | docs: Swagger API 문서 상세화 - API 개요, 인증 방식, 엔드포인트 설명, 에러 코드 추가 |
+| `44e0f35` | docs: README.md 업데이트 - 사용자 관리, 시스템 프롬프트, 운영 환경 설정 추가 |
+| `cf9ae12` | feat: 사용자 관리, 시스템 프롬프트, API Key 해싱 구현 |
+| `552d91c` | docs: README.md 업데이트 및 .gitignore 정리 |
+| `2d56144` | feat: API Key 인증 필터, Redis Rate Limiting, Swagger 보안 설정 추가 |
 | `a6fd311` | fix: README.md 인코딩을 UTF-8로 변환 |
 | `a0585f1` | docs: README.md 작성 - 프로젝트 소개, 기술 스택, API 문서 등 |
 | `fa2a65e` | fix: /conversations 엔드포인트 500 에러 수정 |
