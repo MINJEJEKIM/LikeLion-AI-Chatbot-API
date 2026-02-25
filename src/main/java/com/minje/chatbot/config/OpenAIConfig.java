@@ -31,7 +31,7 @@ public class OpenAIConfig {
                 | **헤더 이름** | `X-API-KEY` |
                 | **위치** | HTTP Header |
                 | **필수 여부** | 필수 |
-                | **형식** | 관리자로부터 발급받은 API Key 문자열 |
+                | **형식** | OPEN AI에서 발급받은 API Key 문자열 |
 
                 ```
                 curl -H "X-API-KEY: your-api-key" https://api-host/api/v1/conversations

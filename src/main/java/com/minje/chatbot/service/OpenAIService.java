@@ -62,7 +62,7 @@ public class OpenAIService {
 
         } catch (Exception e) {
             log.error("Error calling OpenAI API: ", e);
-            throw new RuntimeException("OpenAI API 호출 중 오류가 발생했습니다: " + e.getMessage());
+            throw new RuntimeException("AI 응답 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
         }
     }
 
