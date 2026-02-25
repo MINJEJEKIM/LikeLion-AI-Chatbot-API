@@ -39,13 +39,7 @@ out/
 
 ### Claude Code ###
 .claude/
-nul
 
-/gradle/wrapper/gradle-wrapper.jar
 /src/main/resources/application.yaml
-/gradle/wrapper/gradle-wrapper.properties
-/gradlew
-/gradlew.bat
-/settings.gradle
 /src/main/resources/application-prod.yaml
 /docker-compose.yml
