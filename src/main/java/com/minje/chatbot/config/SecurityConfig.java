@@ -29,7 +29,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public CorsFilter corsFilter() {
+    public FilterRegistrationBean<CorsFilter> corsFilterRegistration() {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
 
@@ -40,6 +40,9 @@ public class SecurityConfig {
         config.addExposedHeader("X-API-Key");
 
         source.registerCorsConfiguration("/**", config);
-        return new CorsFilter(source);
+
+        FilterRegistrationBean<CorsFilter> registration = new FilterRegistrationBean<>(new CorsFilter(source));
+        registration.setOrder(0);
+        return registration;
     }
 }

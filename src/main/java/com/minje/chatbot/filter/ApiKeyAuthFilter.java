@@ -2,6 +2,7 @@ package com.minje.chatbot.filter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.minje.chatbot.dto.ApiResponse;
+import com.minje.chatbot.entity.User;
 import com.minje.chatbot.repository.UserRepository;
 import com.minje.chatbot.util.ApiKeyHashUtil;
 import com.minje.chatbot.util.ApiKeyValidator;
@@ -55,8 +56,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
         String hashedKey = ApiKeyHashUtil.hash(apiKey);
 
         if (userRepository.findByApiKey(hashedKey).isEmpty()) {
-            writeErrorResponse(response, request, "등록되지 않은 API Key입니다.");
-            return;
+            userRepository.save(User.builder().apiKey(hashedKey).build());
         }
 
         request.setAttribute("apiKey", hashedKey);
