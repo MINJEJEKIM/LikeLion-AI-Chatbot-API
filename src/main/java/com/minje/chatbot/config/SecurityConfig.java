@@ -2,6 +2,7 @@ package com.minje.chatbot.config;
 
 import com.minje.chatbot.filter.ApiKeyAuthFilter;
 import com.minje.chatbot.filter.RateLimitFilter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,6 +12,9 @@ import org.springframework.web.filter.CorsFilter;
 
 @Configuration
 public class SecurityConfig {
+
+    @Value("${CORS_ALLOWED_ORIGINS:*}")
+    private String corsAllowedOrigins;
 
     @Bean
     public FilterRegistrationBean<ApiKeyAuthFilter> apiKeyAuthFilterRegistration(ApiKeyAuthFilter filter) {
@@ -34,7 +38,9 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
 
         config.setAllowCredentials(true);
-        config.addAllowedOriginPattern("*");
+        for (String origin : corsAllowedOrigins.split(",")) {
+            config.addAllowedOriginPattern(origin.trim());
+        }
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
         config.addExposedHeader("X-API-Key");

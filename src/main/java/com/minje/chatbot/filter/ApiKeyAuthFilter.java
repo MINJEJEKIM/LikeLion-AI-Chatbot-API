@@ -11,22 +11,27 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 
 @Component
 @RequiredArgsConstructor
 public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
     private static final String API_KEY_HEADER = "X-API-KEY";
+    private static final int MAX_REGISTRATIONS_PER_HOUR = 5;
 
     private final ApiKeyValidator apiKeyValidator;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
+    private final ApiKeyHashUtil apiKeyHashUtil;
+    private final StringRedisTemplate stringRedisTemplate;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -53,9 +58,23 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        String hashedKey = ApiKeyHashUtil.hash(apiKey);
+        String hashedKey = apiKeyHashUtil.hash(apiKey);
 
         if (userRepository.findByApiKey(hashedKey).isEmpty()) {
+            // IP 기반 자동 등록 횟수 제한
+            String clientIp = request.getRemoteAddr();
+            String redisKey = "reg_limit:" + clientIp;
+            Long count = stringRedisTemplate.opsForValue().increment(redisKey);
+
+            if (count == 1) {
+                stringRedisTemplate.expire(redisKey, 1, TimeUnit.HOURS);
+            }
+
+            if (count > MAX_REGISTRATIONS_PER_HOUR) {
+                writeErrorResponse(response, request, "자동 등록 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.");
+                return;
+            }
+
             userRepository.save(User.builder().apiKey(hashedKey).build());
         }
 

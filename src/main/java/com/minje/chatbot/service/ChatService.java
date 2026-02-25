@@ -21,9 +21,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import jakarta.annotation.PreDestroy;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -31,13 +36,31 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class ChatService {
 
+    private static final int MAX_SYSTEM_PROMPT_LENGTH = 1000;
+    private static final int MAX_CONTENT_LENGTH = 5000;
+
     private final UserRepository userRepository;
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
     private final OpenAIService openAIService;
+    private final ExecutorService streamExecutor = Executors.newFixedThreadPool(10);
+
+    @PreDestroy
+    public void shutdown() {
+        streamExecutor.shutdown();
+        try {
+            if (!streamExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                streamExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            streamExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
 
     @Transactional
     public ChatResponse sendMessage(String apiKey, ChatRequest request) {
+        validateInput(request);
         User user = getUserByApiKey(apiKey);
 
         // 대화 조회 또는 생성
@@ -99,6 +122,7 @@ public class ChatService {
 
     @Transactional
     public SseEmitter sendMessageStream(String apiKey, ChatRequest request) {
+        validateInput(request);
         SseEmitter emitter = new SseEmitter(300000L); // 5분 타임아웃
 
         User user = getUserByApiKey(apiKey);
@@ -126,7 +150,7 @@ public class ChatService {
         List<Message> conversationHistory = getRecentMessages(conversation.getId());
 
         // 비동기 스트리밍
-        new Thread(() -> {
+        streamExecutor.submit(() -> {
             try {
                 openAIService.createChatCompletionStream(
                         conversationHistory,
@@ -147,7 +171,7 @@ public class ChatService {
                 log.error("Error in streaming chat", e);
                 emitter.completeWithError(e);
             }
-        }).start();
+        });
 
         return emitter;
     }
@@ -208,6 +232,15 @@ public class ChatService {
     }
 
     // === Private Helper Methods ===
+
+    private void validateInput(ChatRequest request) {
+        if (request.getContent() != null && request.getContent().length() > MAX_CONTENT_LENGTH) {
+            throw new CustomException("BAD_REQUEST", "메시지는 " + MAX_CONTENT_LENGTH + "자 이하여야 합니다.", HttpStatus.BAD_REQUEST);
+        }
+        if (request.getSystemPrompt() != null && request.getSystemPrompt().length() > MAX_SYSTEM_PROMPT_LENGTH) {
+            throw new CustomException("BAD_REQUEST", "시스템 프롬프트는 " + MAX_SYSTEM_PROMPT_LENGTH + "자 이하여야 합니다.", HttpStatus.BAD_REQUEST);
+        }
+    }
 
     private User getUserByApiKey(String apiKey) {
         return userRepository.findByApiKey(apiKey)
