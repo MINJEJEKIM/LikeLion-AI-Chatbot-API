@@ -5,7 +5,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class ApiKeyValidator {
 
-    private static final String API_KEY_PREFIX = "sk-proj-";
+    private static final String API_KEY_PREFIX = "sk-";
 
     /**
      * API Key 형식 검증
