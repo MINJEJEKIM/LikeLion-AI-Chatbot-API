@@ -12,13 +12,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.concurrent.TimeUnit;
+import java.util.Collections;
 
 @Component
 @RequiredArgsConstructor
@@ -26,6 +27,12 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
     private static final String API_KEY_HEADER = "X-API-KEY";
     private static final int MAX_REGISTRATIONS_PER_HOUR = 5;
+    private static final long WINDOW_SECONDS = 3600;
+
+    private static final String LUA_SCRIPT =
+            "local count = redis.call('INCR', KEYS[1]) " +
+            "if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end " +
+            "return count";
 
     private final ApiKeyValidator apiKeyValidator;
     private final UserRepository userRepository;
@@ -61,16 +68,15 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
         String hashedKey = apiKeyHashUtil.hash(apiKey);
 
         if (userRepository.findByApiKey(hashedKey).isEmpty()) {
-            // IP 기반 자동 등록 횟수 제한
+            // IP 기반 자동 등록 횟수 제한 (Lua 스크립트로 원자적 처리)
             String clientIp = request.getRemoteAddr();
             String redisKey = "reg_limit:" + clientIp;
-            Long count = stringRedisTemplate.opsForValue().increment(redisKey);
+            DefaultRedisScript<Long> script = new DefaultRedisScript<>(LUA_SCRIPT, Long.class);
+            Long count = stringRedisTemplate.execute(script,
+                    Collections.singletonList(redisKey),
+                    String.valueOf(WINDOW_SECONDS));
 
-            if (count == 1) {
-                stringRedisTemplate.expire(redisKey, 1, TimeUnit.HOURS);
-            }
-
-            if (count > MAX_REGISTRATIONS_PER_HOUR) {
+            if (count != null && count > MAX_REGISTRATIONS_PER_HOUR) {
                 writeErrorResponse(response, request, "자동 등록 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.");
                 return;
             }
