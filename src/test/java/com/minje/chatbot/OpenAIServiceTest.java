@@ -64,7 +64,7 @@ class OpenAIServiceTest {
 
         System.out.println("요청: " + userMessage);
 
-        String response = openAIService.createChatCompletion(conversationHistory, userMessage);
+        String response = openAIService.createChatCompletion(conversationHistory, userMessage, null);
 
         System.out.println("응답: " + response);
 
@@ -98,7 +98,7 @@ class OpenAIServiceTest {
 
         System.out.println("요청 (컨텍스트 포함): " + userMessage);
 
-        String response = openAIService.createChatCompletion(conversationHistory, userMessage);
+        String response = openAIService.createChatCompletion(conversationHistory, userMessage, null);
 
         System.out.println("응답: " + response);
 
@@ -123,7 +123,7 @@ class OpenAIServiceTest {
         for (String msg : testMessages) {
             System.out.println("요청 " + (conversationHistory.size() / 2 + 1) + ": " + msg);
 
-            String response = openAIService.createChatCompletion(conversationHistory, msg);
+            String response = openAIService.createChatCompletion(conversationHistory, msg, null);
 
             System.out.println("응답 " + (conversationHistory.size() / 2 + 1) + ": " + response);
 
