@@ -47,7 +47,7 @@ API Key 기반으로 사용자를 식별하며, 각 사용자는 자신의 대�
 
 - API Key별로 사용자가 구분되며, 대화/메시지가 사용자 단위로 격리됩니다
 - 다른 사용자의 대화에 접근 시 `403 Forbidden` 반환
-- API Key는 SHA-256 해시로 DB에 저장되어 원본 키가 노출되지 않습니다
+- API Key는 HMAC-SHA256 해시로 DB에 저장되어 원본 키가 노출되지 않습니다
 
 ## 시스템 프롬프트
 
@@ -63,12 +63,13 @@ AI의 역할/페르소나를 지정할 수 있습니다.
 모든 API 요청에 `X-API-KEY` 헤더가 필요합니다. (Swagger UI 경로 제외)
 
 ```
-X-API-KEY: sk-proj-your-api-key
+X-API-KEY: sk-your-api-key
 ```
 
+- `sk-`로 시작하는 모든 OpenAI API Key 허용 (`sk-proj-`, `sk-svcacct-`, 레거시 `sk-` 등)
 - 키가 없거나 형식이 잘못된 경우 `401 Unauthorized` 반환
-- 유효한 형식의 새 키는 자동으로 사용자 등록 후 사용 가능
-- API Key는 SHA-256 해시 후 DB 조회
+- 유효한 형식의 새 키는 자동으로 사용자 등록 후 사용 가능 (IP당 시간당 5회 제한)
+- API Key는 HMAC-SHA256 해시 후 DB 조회
 
 ### Rate Limiting
 Redis 기반 고정 윈도우 방식으로 API Key당 **분당 10회** 요청을 제한합니다.
@@ -153,7 +154,7 @@ docker run -p 8080:8080 \
   -e REDIS_HOST=redis-host \
   -e REDIS_PORT=6379 \
   -e REDIS_PASSWORD=your_redis_password \
-  -e OPENAI_API_KEY=sk-proj-... \
+  -e OPENAI_API_KEY=sk-... \
   chatbot
 ```
 
@@ -179,7 +180,7 @@ http://localhost:8080/api/v1/swagger-ui.html
 ## Features
 
 - **사용자 관리** - API Key 기반 사용자 격리 및 대화 소유권 검증
-- **API Key 해싱** - SHA-256으로 해시하여 DB에 안전하게 저장
+- **API Key 해싱** - HMAC-SHA256 + pepper로 해시하여 DB에 안전하게 저장
 - **시스템 프롬프트** - AI 역할/페르소나 지정 및 대화별 유지
 - **API Key 인증** - X-API-KEY 헤더 기반 인증 필터
 - **Rate Limiting** - Redis 기반 API Key당 분당 10회 요청 제한
@@ -199,17 +200,15 @@ http://localhost:8080/api/v1/swagger-ui.html
 
 | Commit | Description |
 |--------|-------------|
+| `a0395d6` | fix: API Key 접두사 검증을 sk-proj-에서 sk-로 완화 |
+| `6798d80` | chore: 미사용 코드 제거 및 코드 품질 개선 |
+| `0431ba2` | fix: Critical/High 보안 취약점 10건 수정 |
+| `451638c` | docs: README.md 업데이트 - Docker/Railway 배포, API Key 자동 등록, 헬스체크 반영 |
 | `8e5212d` | chore: Railway 배포를 위한 .gitignore 정리 및 Gradle wrapper 추가 |
 | `a4815b1` | feat: Docker 배포 설정 및 API 인증 개선 |
 | `0afa5c6` | feat: 헬스체크 엔드포인트 추가 (GET /health) |
-| `05386c0` | docs: Swagger API 문서 상세화 - API 개요, 인증 방식, 엔드포인트 설명, 에러 코드 추가 |
+| `05386c0` | docs: Swagger API 문서 상세화 |
 | `44e0f35` | docs: README.md 업데이트 - 사용자 관리, 시스템 프롬프트, 운영 환경 설정 추가 |
 | `cf9ae12` | feat: 사용자 관리, 시스템 프롬프트, API Key 해싱 구현 |
-| `552d91c` | docs: README.md 업데이트 및 .gitignore 정리 |
 | `2d56144` | feat: API Key 인증 필터, Redis Rate Limiting, Swagger 보안 설정 추가 |
-| `a6fd311` | fix: README.md 인코딩을 UTF-8로 변환 |
-| `a0585f1` | docs: README.md 작성 - 프로젝트 소개, 기술 스택, API 문서 등 |
-| `fa2a65e` | fix: /conversations 엔드포인트 500 에러 수정 |
-| `58e8705` | fix: ChatService 및 관련 클래스 호환성 문제 수정 |
 | `4f01ae7` | initial setting |
-| `68b0785` | first commit |
